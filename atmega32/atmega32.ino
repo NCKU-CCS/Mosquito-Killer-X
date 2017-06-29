@@ -10,7 +10,8 @@ uint32_t count = 0;
 
 void pinChanged(){
   
-  if(!digitalRead(7)){
+  if(!digitalRead(7)&&!digitalRead(2){
+    //not or = and
     //Serial.println("Low");
     if(millis()-lastInterrupt>100){
       lastInterrupt = millis();
@@ -44,6 +45,9 @@ void setup(){
   pinMode(7, INPUT);
   attachInterrupt(4,pinChanged, CHANGE);
   /*4(external interrupt) is correspond to d7 pin*/
+  pinMode(2, INPUT);  
+  attachInterrupt(1, pinChanged, CHANGE);
+  /*2 is to 1*/
 }
 
 
