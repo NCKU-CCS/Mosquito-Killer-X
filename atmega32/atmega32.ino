@@ -10,7 +10,7 @@ uint32_t count = 0;
 
 void pinChanged(){
   
-  if(!digitalRead(7)&&!digitalRead(2){
+  if(!digitalRead(7)&&!digitalRead(2)){
     //not or = and
     //Serial.println("Low");
     if(millis()-lastInterrupt>100){
