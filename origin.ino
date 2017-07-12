@@ -1,6 +1,5 @@
 #include <LWiFi.h>
-#include <LBLE.h>
-#include <LBLEPeriphral.h>
+#include <WiFiUdp.h>
 
 #define CLK 5//pins definitions for TM1637 and can be changed to other ports
 #define DIO 6
@@ -16,21 +15,9 @@ int status = WL_IDLE_STATUS;
 char ssid[] = ""; //  your network SSID (name)
 char pass[] = "";    // your network password (use for WPA, or use as key for WEP)
 
-char server[] = "52.197.111.123";
+char server[] = "";
 //unsigned int localPort = 2390;      // local port to listen on
 
-bool _wasConnected;
-String _ssidString;
-String _passString;
-LBLEService _periphralService("D709A00C-DA1A-4726-A33D-CF62B8F4C3D6");
-/*
- * SSID & password must be sent as UTF-8 String and length 
- * must < 20 bytes due to BLE MTU limitation. 
- * 
- * If password length equals to 0, will connect to SSID as open.
- */
-LBLECharacteristicString _ssidRead("61DE21BC-6E02-4631-A0A7-1B6C7AF0DAEE", LBLE_WRITE);
-LBLECharacteristicString _passRead("B882467F-77BC-4697-9A4A-4F3366BC6C35", LBLE_WRITE);
 
 
 WiFiClient client;
@@ -71,56 +58,37 @@ void printWifiStatus() {
   Serial.print(rssi);
   Serial.println(" dBm");
 }
-
-void connectWiFi(const String ssidString, const String passString)
-{
-  if (ssidString.length()) {
-        const int ssidLen = ssidString.length() + 1;
-        const int passLen = passString.length() + 1;
-        char ssidCString[ssidLen];
-        char passCString[passLen];
-        ssidString.toCharArray(ssidCString, ssidLen);
-        passString.toCharArray(passCString, passLen);
-        
-        Serial.print("Connecting to: [");
-        Serial.print(String(ssidCString));
-        if (passString.length()) {
-            Serial.print("] [");
-            Serial.print(String(passCString));
-        }
-        Serial.println("]");
-        if (passString.length()) {
-            WiFi.begin(ssidCString, passCString);
-        } else {
-            WiFi.begin(ssidCString);
-        }
-    }
+/*
+void httpRequest() {
+  // close any connection before send a new request.
+  // This will free the socket on the WiFi shield
+  client.stop();
+  // if there's a successful connection:
+  if (client.connect(server, 80)) {
+    Serial.println("connecting...");
+    // send the HTTP PUT request:
+    client.println("GET /latest.txt HTTP/1.1");
+    client.println("Host: www.arduino.cc");
+    client.println("User-Agent: ArduinoWiFi/1.1");
+    client.println("Connection: close");
+    client.println();
+  } else {
+    // if you couldn't make a connection:
+    Serial.println("connection failed");
+  }
 }
+*/
 
 void setup(){
   Serial.begin(9600);
   
   Serial.println("Started");
-  LBLE.begin();
-  while (!LBLE.ready()) {
-    delay(100); 
-  }
-  _periphralService.addAttribute(_ssidRead);
-  _periphralService.addAttribute(_passRead);
-  LBLEPeripheral.addService(_periphralService);
-  LBLEPeripheral.begin();
-  LBLEAdvertisementData _advertisement;
-  _advertisement.configAsConnectableDevice("Mosquito Killer22222");
-  LBLEPeripheral.advertise(_advertisement);
-  Serial.println("BLE Ready!");
-  
-  
+
   pinMode(2, INPUT);
   attachInterrupt(2,pinChanged, CHANGE);
   /*pin 2*/
 
   // attempt to connect to Wifi network:
-  /*
   while (status != WL_CONNECTED) {
     Serial.print("Attempting to connect to SSID: ");
     Serial.println(ssid);
@@ -131,7 +99,7 @@ void setup(){
   printWifiStatus();
 
   Serial.println("\nStarting connection to server...");
-  */
+  
 }
 
 
@@ -139,26 +107,6 @@ uint32_t pulseStart = 0;
 bool pulseEnter = 0;
 
 void loop(){
-  
-    if (_ssidRead.isWritten()) {
-        WiFi.disconnect();
-        _ssidString = _ssidRead.getValue();
-        _passString = "";
-        Serial.print("New SSID: ");
-        Serial.println(_ssidString);
-    }
-    if (_passRead.isWritten()) {
-        WiFi.disconnect();
-        _passString = _passRead.getValue();
-        Serial.print("New Password: ");
-        Serial.println(_passString);
-    }
-    if ( ( _ssidString.length() || _passString.length() ) && WiFi.status() != WL_CONNECTED) {
-        Serial.print("Connecting Status: ");
-        Serial.println(WiFi.status());
-        connectWiFi(_ssidString, _passString);
-        printWifiStatus();
-    }
   
   if(interrupted){
       count++;
