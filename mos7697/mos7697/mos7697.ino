@@ -16,7 +16,7 @@ int status = WL_IDLE_STATUS;
 char ssid[] = ""; //  your network SSID (name)
 char pass[] = "";    // your network password (use for WPA, or use as key for WEP)
 
-char server[] = "52.197.111.123";
+char server[] = "";
 //unsigned int localPort = 2390;      // local port to listen on
 
 bool _wasConnected;
@@ -36,7 +36,7 @@ LBLECharacteristicString _passRead("B882467F-77BC-4697-9A4A-4F3366BC6C35", LBLE_
 WiFiClient client;
 
 
-void pinChanged(){
+/*/void pinChanged(){
   
   if(!digitalRead(2)){
     if(millis()-lastInterrupt>100){
@@ -53,7 +53,7 @@ void pinChanged(){
     }
   }
 
-}
+}/*/
 
 void printWifiStatus() {
   // print the SSID of the network you're attached to:
@@ -116,11 +116,11 @@ void setup(){
   
   
   pinMode(2, INPUT);
-  attachInterrupt(2,pinChanged, CHANGE);
+  //attachInterrupt(2,pinChanged, CHANGE);
   /*pin 2*/
 
   // attempt to connect to Wifi network:
-  /*
+  
   while (status != WL_CONNECTED) {
     Serial.print("Attempting to connect to SSID: ");
     Serial.println(ssid);
@@ -131,7 +131,7 @@ void setup(){
   printWifiStatus();
 
   Serial.println("\nStarting connection to server...");
-  */
+  
 }
 
 
@@ -139,7 +139,7 @@ uint32_t pulseStart = 0;
 bool pulseEnter = 0;
 
 void loop(){
-  
+  /*
     if (_ssidRead.isWritten()) {
         WiFi.disconnect();
         _ssidString = _ssidRead.getValue();
@@ -159,8 +159,10 @@ void loop(){
         connectWiFi(_ssidString, _passString);
         printWifiStatus();
     }
-  
-  if(interrupted){
+  */
+  if(digitalRead(2)==0){
+      while(digitalRead(2)==1){};
+      while(digitalRead(2)==0){};
       count++;
       Serial.println(count);
 
@@ -170,7 +172,7 @@ void loop(){
       if (client.connect(server, 3000)) {
         Serial.println("connecting...");
         // send the HTTP PUT request:
-        String jsonStr = "{\"bugZapperId\":210,\"lng\":56.7,\"lat\":23.997916,\"cnt\":" + String(count) + "}";  // 定義JSON字串
+        String jsonStr = "{\"bugZapperId\":123,\"lng\":56.7,\"lat\":23.997916,\"cnt\":" + String(count) + "}";  // 定義JSON字串
         Serial.println(jsonStr);
         client.println("POST /bugZapper/ HTTP/1.1");
         client.println("Content-Type: application/json");
@@ -182,7 +184,8 @@ void loop(){
           // if you couldn't make a connection:
           Serial.println("connection failed");
         }
-      interrupted = 0;
+     // interrupted = 0;
   }
   
 }
+
