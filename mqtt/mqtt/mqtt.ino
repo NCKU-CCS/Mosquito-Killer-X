@@ -1,7 +1,7 @@
 #include <LWiFi.h>
 #include <LBLE.h>
 #include <LBLEPeriphral.h>
-#include <PubSubClient.h>
+#include <MQTTClient.h>
 
 #define CLK 5//pins definitions for TM1637 and can be changed to other ports
 #define DIO 6
@@ -37,7 +37,7 @@ LBLECharacteristicString _passRead("B882467F-77BC-4697-9A4A-4F3366BC6C35", LBLE_
 
 
 WiFiClient client;
-PubSubClient mqtt_client(client);
+MQTTClient mqtt_client;
 
 
 
@@ -115,16 +115,35 @@ void setup(){
   }
   Serial.println("Connected to wifi");
   printWifiStatus();
-  mqtt_client.setServer(mqtt_server, 1883);
+  mqtt_client.begin(mqtt_server, 1883, client);
   Serial.println("\nStarting connection to server...");
+  connect();
   randomSeed(analogRead(0));
 }
 
+
+void connect() {
+  Serial.print("checking wifi...");
+  while (WiFi.status() != WL_CONNECTED) {
+    Serial.print(".");
+    delay(1000);
+  }
+
+  Serial.print("\nconnecting...");
+  String clientId = String(random(0xffff),HEX);
+  while (!mqtt_client.connect(clientId.c_str())) {
+    Serial.print(".");
+    delay(1000);
+  }
+
+  Serial.println("\nconnected!");
+}
 
 uint32_t pulseStart = 0;
 bool pulseEnter = 0;
 
 void loop(){
+  mqtt_client.loop();
   if(digitalRead(2)==0) {
       while(digitalRead(2)==1){};
       while(digitalRead(2)==0){};
@@ -133,24 +152,13 @@ void loop(){
       
       // if there's a successful connection:
       while(!mqtt_client.connected()) {
-        Serial.println("connecting...");
-        String clientId = String(random(0xffff),HEX);
-        Serial.println(clientId.c_str());
-        if(mqtt_client.connect(clientId.c_str())) {
-            Serial.println("connected");
-        }
-        else {
-          //connected failed
-          Serial.println("connection failed, ");
-          Serial.print(mqtt_client.state());
-          delay(5000);
-        }
+        connect();
       }
       mqtt_client.loop();
-      String jsonStr = "{\"id\":\"LAB170912-01\",\"cnt\":" + String(count) + "}";  // 定義JSON字串
+      String jsonStr = "{\"id\":\"LAB170913-01\",\"cnt\":" + String(count) + "}";  // 定義JSON字串
       Serial.println("publish success");
       jsonStr.toCharArray(publish_json, 100);
-      mqtt_client.publish(Topic, publish_json);
+      mqtt_client.publish(Topic, publish_json, false, 1);
       mqtt_client.disconnect();
   }
   
