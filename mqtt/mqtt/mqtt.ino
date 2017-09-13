@@ -17,7 +17,7 @@ int status = WL_IDLE_STATUS;
 char ssid[] = ""; //  your network SSID (name)
 char pass[] = "";    // your network password (use for WPA, or use as key for WEP)
 
-char mqtt_server[] = "iot.eclipse.org";
+char mqtt_server[] = "";
 char Topic[] = "";
 char publish_json[100];
 //unsigned int localPort = 2390;      // local port to listen on
@@ -147,10 +147,11 @@ void loop(){
         }
       }
       mqtt_client.loop();
-      String jsonStr = "{\"bugZapperId\":123,\"lng\":56.7,\"lat\":23.997916,\"cnt\":" + String(count) + "}";  // 定義JSON字串
+      String jsonStr = "{\"id\":\"LAB170912-01\",\"cnt\":" + String(count) + "}";  // 定義JSON字串
       Serial.println("publish success");
       jsonStr.toCharArray(publish_json, 100);
       mqtt_client.publish(Topic, publish_json);
+      mqtt_client.disconnect();
   }
   
 }
