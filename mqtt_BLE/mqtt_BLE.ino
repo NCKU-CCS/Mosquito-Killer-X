@@ -17,24 +17,24 @@ int status = WL_IDLE_STATUS;
 char ssid[] = ""; //  your network SSID (name)
 char pass[] = "";    // your network password (use for WPA, or use as key for WEP)
 
-char mqtt_server[] = "";
+char mqtt_server[] = "iot.eclipse.org";
 char Topic[] = "";
 char publish_json[100];
 //unsigned int localPort = 2390;      // local port to listen on
 
 bool _wasConnected;
-String _ssidString;
-String _passString;
-LBLEService _periphralService("D709A00C-DA1A-4726-A33D-CF62B8F4C3D6");
+String ssidString;
+String passString;
+LBLEService periphralService("19B10010-E8F2-537E-4F6C-D104768A1214");
 /*
  * SSID & password must be sent as UTF-8 String and length 
  * must < 20 bytes due to BLE MTU limitation. 
  * 
  * If password length equals to 0, will connect to SSID as open.
  */
-LBLECharacteristicString _ssidRead("61DE21BC-6E02-4631-A0A7-1B6C7AF0DAEE", LBLE_WRITE);
-LBLECharacteristicString _passRead("B882467F-77BC-4697-9A4A-4F3366BC6C35", LBLE_WRITE);
-
+LBLECharacteristicString ssidCharacteristic("19B10011-E8F2-537E-4F6C-D104768A1214", LBLE_WRITE);
+LBLECharacteristicString passCharacteristic("19B10012-E8F2-537E-4F6C-D104768A1214", LBLE_WRITE);
+LBLECharacteristicString connetedCharacteristic("19B10013-E8F2-537E-4F6C-D104768A1214", LBLE_READ);
 
 WiFiClient client;
 MQTTClient mqtt_client;
@@ -80,6 +80,16 @@ void connectWiFi(const String ssidString, const String passString)
         } else {
             WiFi.begin(ssidCString);
         }
+        if (WiFi.status() == WL_CONNECTED) {
+          mqtt_client.begin(mqtt_server, 1883, client);
+          Serial.print("connect succeed");
+          connect();
+          connetedCharacteristic.setValue("connected");
+        }
+        else {
+          Serial.print("connect fail");
+          connetedCharacteristic.setValue("failed");
+        }
     }
 }
 
@@ -91,33 +101,19 @@ void setup(){
   while (!LBLE.ready()) {
     delay(100); 
   }
-  _periphralService.addAttribute(_ssidRead);
-  _periphralService.addAttribute(_passRead);
-  LBLEPeripheral.addService(_periphralService);
+  Serial.println(LBLE.getDeviceAddress());
+  periphralService.addAttribute(ssidCharacteristic);
+  periphralService.addAttribute(passCharacteristic);
+  periphralService.addAttribute(connetedCharacteristic);
+  LBLEPeripheral.addService(periphralService);
   LBLEPeripheral.begin();
-  LBLEAdvertisementData _advertisement;
-  _advertisement.configAsConnectableDevice("Mosquito Killer22222");
-  LBLEPeripheral.advertise(_advertisement);
+  LBLEAdvertisementData advertisement;
+  advertisement.configAsConnectableDevice("KG0915-04");
+  LBLEPeripheral.advertise(advertisement);
   Serial.println("BLE Ready!");
   
   
   pinMode(2, INPUT);
-  //attachInterrupt(2,pinChanged, CHANGE);
-  /*pin 2*/
-
-  // attempt to connect to Wifi network:
-  
-  while (status != WL_CONNECTED) {
-    Serial.print("Attempting to connect to SSID: ");
-    Serial.println(ssid);
-    // Connect to WPA/WPA2 network. Change this line if using open or WEP network:
-    status = WiFi.begin(ssid, pass);
-  }
-  Serial.println("Connected to wifi");
-  printWifiStatus();
-  mqtt_client.begin(mqtt_server, 1883, client);
-  Serial.println("\nStarting connection to server...");
-  connect();
   randomSeed(analogRead(0));
 }
 
@@ -143,25 +139,36 @@ uint32_t pulseStart = 0;
 bool pulseEnter = 0;
 
 void loop(){
-  mqtt_client.loop();
-  if(digitalRead(2)==0) {
-      while(digitalRead(2)==1){};
-      while(digitalRead(2)==0){};
-      count++;
-      Serial.println(count);
-      
-      // if there's a successful connection:
-      while(!mqtt_client.connected()) {
-        connect();
-      }
+  if (WiFi.status() == WL_CONNECTED) {
       mqtt_client.loop();
-      String jsonStr = "{\"id\":\"LAB170913-01\",\"cnt\":" + String(count) + "}";  // 定義JSON字串
-      Serial.println("publish success");
-      jsonStr.toCharArray(publish_json, 100);
-      mqtt_client.publish(Topic, publish_json, false, 1);
-      mqtt_client.disconnect();
+      if(digitalRead(2)==0) {
+        while(digitalRead(2)==1){};
+        while(digitalRead(2)==0){};
+        count++;
+        Serial.println(count);
+      
+        // if there's a successful connection:
+        while(!mqtt_client.connected()) {
+          connect();
+        }
+        mqtt_client.loop();
+        String jsonStr = "{\"id\":\"KG0915-04\",\"cnt\":" + String(count) + "}";  // 定義JSON字串
+        Serial.println("publish success");
+        jsonStr.toCharArray(publish_json, 100);
+        mqtt_client.publish(Topic, publish_json, false, 1);
+        mqtt_client.disconnect();
+      }
   }
-  
+  if(ssidCharacteristic.isWritten()) {
+    ssidString = ssidCharacteristic.getValue();
+    ssidCharacteristic.setValue("");
+    Serial.print("ssid="); Serial.println(ssidString);
+  }
+  if(passCharacteristic.isWritten()) {
+    passString = passCharacteristic.getValue();
+    passCharacteristic.setValue("");
+    Serial.print("pass="); Serial.println(passString);
+    connectWiFi(ssidString, passString);
+  }
 }
-
 
