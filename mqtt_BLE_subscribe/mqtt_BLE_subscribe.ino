@@ -1,8 +1,8 @@
 #include <LWiFi.h>
 #include <LBLE.h>
 #include <LBLEPeriphral.h>
-#include <LTimer.h>
 #include <MQTTClient.h>
+
 
 #define CLK 5//pins definitions for TM1637 and can be changed to other ports
 #define DIO 6
@@ -18,26 +18,28 @@ int status = WL_IDLE_STATUS;
 
 char mqtt_server[] = "";
 char Topic[] = "";
+char SubTopic[] = "";
 char publish_json[100];
 //unsigned int localPort = 2390;      // local port to listen on
 
-bool _wasConnected;
-String ssidString = "";
-String passString = "";
-String bugZapperId = "";
-LBLEService periphralService("19B10010-E8F2-537E-4F6C-D104768A1214");
+bool wasReceived = false;
 /*
  * SSID & password must be sent as UTF-8 String and length 
  * must < 20 bytes due to BLE MTU limitation. 
- * 
+ * bugZapperId
  * If password length equals to 0, will connect to SSID as open.
  */
+String ssidString = "";
+String passString = "";
+String bugZapperId = "";
+
+LBLEService periphralService("19B10010-E8F2-537E-4F6C-D104768A1214");
 LBLECharacteristicString ssidCharacteristic("19B10011-E8F2-537E-4F6C-D104768A1214", LBLE_WRITE);
 LBLECharacteristicString passCharacteristic("19B10012-E8F2-537E-4F6C-D104768A1214", LBLE_WRITE);
 LBLECharacteristicString connetedCharacteristic("19B10013-E8F2-537E-4F6C-D104768A1214", LBLE_READ);
 
 WiFiClient client;
-MQTTClient mqtt_client;
+MQTTClient mqtt_client(256);
 
 String jsonStr;
 
@@ -82,6 +84,7 @@ void connectWiFi(const String ssidString, const String passString)
         }
         if (WiFi.status() == WL_CONNECTED) {
           mqtt_client.begin(mqtt_server, 1883, client);
+          mqtt_client.onMessage(messageReceived);
           Serial.print("connect succeed");
           connect();
           connetedCharacteristic.setValue("connected");
@@ -120,31 +123,27 @@ void setup(){
 
 
 void connect() {
-  Serial.print("checking wifi...");
-  while (WiFi.status() != WL_CONNECTED) {
-    Serial.print(".");
-    delay(1000);
-  }
-
-  Serial.print("\nconnecting...");
   String clientId = String(random(0xffff),HEX);
   while (!mqtt_client.connect(clientId.c_str())) {
-    Serial.print(".");
     delay(1000);
   }
-
-  Serial.println("\nconnected!");
+  mqtt_client.subscribe(SubTopic);
 }
 
 uint32_t pulseStart = 0;
 bool pulseEnter = 0;
+unsigned long lastMillis = 0;
 
 void loop(){
-  if (WiFi.status() == WL_CONNECTED) {
-      mqtt_client.loop();
-      if (!mqtt_client.connected()) {
-        connect();
-      }
+
+   if (millis() - lastMillis > 1000) {
+    lastMillis = millis();
+    mqtt_client.loop();
+    if (!mqtt_client.connected()) {
+      connect();
+    }
+   }
+   if (WiFi.status() == WL_CONNECTED ) {
       if(digitalRead(2)==0) {
         while(digitalRead(2)==1){};
         while(digitalRead(2)==0){};
@@ -160,13 +159,33 @@ void loop(){
         Serial.println("publish success");
         jsonStr.toCharArray(publish_json, 100);
         mqtt_client.publish(Topic, publish_json, false, 1);
-        mqtt_client.disconnect();
+        mqtt_client.loop();
+        if (!mqtt_client.connected()) {
+          connect();
+        }
+      }
+      if (wasReceived == true) {
+        wasReceived = false;
+        Serial.println("recieved the message");
+        mqtt_client.loop();
+        while(!mqtt_client.connected()) {
+          connect();
+        }
+        jsonStr = "{\"id\":\"" + bugZapperId + "\"}";  // 定義JSON字串
+        Serial.println("publish success");
+        jsonStr.toCharArray(publish_json, 100);
+        mqtt_client.publish(Topic, publish_json, false, 1);
+        mqtt_client.loop();
+        if (!mqtt_client.connected()) {
+          connect();
+        }
       }
   }
   if(ssidCharacteristic.isWritten()) {
     ssidString = ssidCharacteristic.getValue();
     ssidCharacteristic.setValue("");
     Serial.print("ssid="); Serial.println(ssidString);
+    connectWiFi(ssidString, passString);
   }
   if(passCharacteristic.isWritten()) {
     passString = passCharacteristic.getValue();
@@ -176,3 +195,6 @@ void loop(){
   }
 }
 
+void messageReceived(String &topic, String &payload) {
+  Serial.println("incoming: " + topic + " - " + payload);
+}
